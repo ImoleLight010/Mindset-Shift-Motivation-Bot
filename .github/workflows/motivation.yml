@@ -82,6 +82,17 @@ jobs:
 
           message = messages.get(hour)
 
+if not message:
+    message = """🤖 MINDSET SHIFT BOT — TEST MESSAGE!
+
+Your motivation bot is connected to GitHub Actions.
+
+🌱 Keep learning.
+💡 Keep thinking.
+🚀 Keep growing.
+
+Better Thinking. Broader Understanding. Practical Growth."""
+
           if not message:
               print("No scheduled message for this UTC hour.")
               raise SystemExit(0)
