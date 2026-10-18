@@ -1,0 +1,111 @@
+name: Mindset Shift Daily Motivation
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+    - cron: '0 11 * * *'
+    - cron: '0 15 * * *'
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+jobs:
+  send-motivation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send daily motivation
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python - <<'PY'
+          import os
+          import json
+          import urllib.request
+          from datetime import datetime, timezone
+
+          token = os.environ["BOT_TOKEN"]
+          chat_id = os.environ["CHAT_ID"]
+
+          hour = datetime.now(timezone.utc).hour
+
+          messages = {
+              6: """🌅 GOOD MORNING, MINDSET SHIFTERS!
+
+              Every new day is another opportunity to learn, grow, and become better than yesterday.
+
+              📖 Reflection: Small, consistent steps can lead to remarkable progress.
+
+              💡 Today's challenge: What one positive action will you take today?
+
+              Remember: Better Thinking. Broader Understanding. Practical Growth. 🚀""",
+
+              11: """☀️ AFTERNOON MINDSET CHALLENGE!
+
+              Growth begins when you move from merely knowing to actually doing.
+
+              🎯 Today's challenge:
+              Identify one thing you've been postponing and take the first practical step toward completing it.
+
+              💬 QUESTION: What usually stops people from acting on what they know?
+
+              Share your thoughts below! 👇""",
+
+              15: """🧠 WISDOM OF THE DAY
+
+              📖 BIBLE — Proverbs 4:7
+              "Wisdom is the principal thing; therefore get wisdom: and with all thy getting get understanding."
+
+              ☪️ QURAN — Surah Az-Zumar 39:9 (excerpt)
+              هَلْ يَسْتَوِي الَّذِينَ يَعْلَمُونَ وَالَّذِينَ لَا يَعْلَمُونَ
+              Meaning: "Are those who know equal to those who do not know?"
+
+              🔬 SCIENCE: Learning and practising new skills helps strengthen the brain's ability to adapt.
+
+              💭 PHILOSOPHY: Examine your assumptions before accepting them as truth.
+
+              🎯 QUESTION: Which source of wisdom most challenges your thinking today?""",
+
+              19: """🌙 EVENING REFLECTION — MINDSET SHIFTERS
+
+              Before today ends, pause and reflect.
+
+              ✅ What did you learn today?
+              ✅ What did you do well?
+              ✅ What could you improve tomorrow?
+
+              Growth doesn't require perfection. It requires reflection, honesty, and a willingness to improve.
+
+              💬 DISCUSSION: What is one lesson you'll carry into tomorrow?
+
+              Rest well, keep learning, and keep growing! 💡"""
+          }
+
+          message = messages.get(hour)
+
+          if not message:
+              print("No scheduled message for this UTC hour.")
+              raise SystemExit(0)
+
+          payload = json.dumps({
+              "chat_id": chat_id,
+              "text": message
+          }).encode("utf-8")
+
+          request = urllib.request.Request(
+              f"https://api.telegram.org/bot{token}/sendMessage",
+              data=payload,
+              headers={"Content-Type": "application/json"}
+          )
+
+          try:
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  result = json.load(response)
+              if result.get("ok"):
+                  print("Message sent successfully.")
+              else:
+                  print("Telegram rejected the message. Check bot permissions and secrets.")
+                  raise SystemExit(1)
+          except Exception:
+              print("Message could not be sent. Check the bot permissions, secrets, and workflow logs.")
+              raise SystemExit(1)
+          PY
