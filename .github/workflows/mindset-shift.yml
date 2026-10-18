@@ -1,0 +1,151 @@
+name: Mindset Shift Motivation Bot
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+    - cron: '0 11 * * *'
+    - cron: '0 15 * * *'
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+jobs:
+  send-message:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Mindset Shift message
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python - <<'PY'
+          import os
+          import json
+          import urllib.request
+          import urllib.error
+          from datetime import datetime, timezone
+
+          token = os.environ.get("BOT_TOKEN", "").strip()
+          chat_id = os.environ.get("CHAT_ID", "").strip()
+
+          if not token or not chat_id:
+              print("ERROR: Required GitHub secrets are missing.")
+              raise SystemExit(1)
+
+          # GitHub's scheduled times use UTC.
+          # Nigeria time is UTC+1.
+          utc_hour = datetime.now(timezone.utc).hour
+
+          messages = {
+              6: """🌅 GOOD MORNING, MINDSET SHIFTERS!
+
+          Every new day brings another opportunity to learn, grow, and become better.
+
+          📖 Remember: Progress begins when you take action.
+
+          🎯 TODAY'S CHALLENGE:
+          What one positive action will you take today?
+
+          Better Thinking. Broader Understanding. Practical Growth. 🚀""",
+
+              11: """☀️ AFTERNOON MINDSET CHALLENGE!
+
+          Knowing what to do is important. Taking action is what makes the difference.
+
+          🎯 Today's challenge:
+          Identify one thing you have been postponing and take the first step toward completing it.
+
+          💬 DISCUSSION:
+          What usually prevents people from acting on what they know?
+
+          Share your thoughts with the group! 👇""",
+
+              15: """🧠 WISDOM OF THE DAY
+
+          📖 BIBLE — Proverbs 4:7
+          "Wisdom is the principal thing; therefore get wisdom: and with all thy getting get understanding."
+
+          ☪️ QURAN — Surah Az-Zumar 39:9
+          أَمَّنْ هُوَ قَانِتٌ آنَاءَ اللَّيْلِ سَاجِدًا وَقَائِمًا
+          Meaning: "Is one who is devoutly obedient during periods of the night, prostrating and standing..."
+
+          🔬 SCIENCE:
+          Learning, practising, and reflecting can help strengthen skills over time.
+
+          💭 PHILOSOPHY:
+          Question your assumptions and examine your reasons before accepting an idea.
+
+          🎯 QUESTION:
+          What new idea has challenged your thinking recently?""",
+
+              19: """🌙 EVENING REFLECTION — MINDSET SHIFTERS
+
+          Before today ends, take a moment to reflect.
+
+          ✅ What did you learn today?
+          ✅ What did you do well?
+          ✅ What can you improve tomorrow?
+
+          Growth does not require perfection. It requires reflection, honesty, and a willingness to improve.
+
+          💬 DISCUSSION:
+          What is one lesson you will carry into tomorrow?
+
+          Rest well, keep learning, and keep growing! 💚"""
+          }
+
+          # Manual runs always send a test message.
+          # Scheduled runs select the message for their UTC hour.
+          event = os.environ.get("GITHUB_EVENT_NAME", "")
+
+          if event == "workflow_dispatch":
+              message = """🤖 MINDSET SHIFT BOT — TEST MESSAGE!
+
+          Great news! Your workflow has started successfully.
+
+          🌱 Keep learning.
+          💡 Keep thinking.
+          🚀 Keep growing.
+
+          Better Thinking. Broader Understanding. Practical Growth.
+
+          If you can read this in the group, the bot can send messages! 🎉"""
+          else:
+              message = messages.get(utc_hour)
+
+          if not message:
+              print("No message is scheduled for this hour.")
+              raise SystemExit(0)
+
+          payload = json.dumps({
+              "chat_id": chat_id,
+              "text": message
+          }).encode("utf-8")
+
+          request = urllib.request.Request(
+              f"https://api.telegram.org/bot{token}/sendMessage",
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST"
+          )
+
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  result = json.load(response)
+
+              if result.get("ok"):
+                  print("SUCCESS: Message sent to the Telegram group.")
+              else:
+                  print("ERROR: Telegram did not accept the message.")
+                  print("Check the bot's group permissions and chat ID.")
+                  raise SystemExit(1)
+
+          except urllib.error.HTTPError as error:
+              print(f"Telegram returned HTTP error {error.code}.")
+              print("Check the bot token, group ID, and permissions.")
+              raise SystemExit(1)
+
+          except urllib.error.URLError:
+              print("Could not connect to Telegram. Please try again.")
+              raise SystemExit(1)
+          PY
