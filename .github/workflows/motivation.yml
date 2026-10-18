@@ -80,7 +80,7 @@ jobs:
               Rest well, keep learning, and keep growing! 💡"""
           }
 
-          message = messages.get(hour)
+                        message = messages.get(hour)
 
 if not message:
     message = """🤖 MINDSET SHIFT BOT — TEST MESSAGE!
@@ -92,31 +92,3 @@ Your motivation bot is connected to GitHub Actions.
 🚀 Keep growing.
 
 Better Thinking. Broader Understanding. Practical Growth."""
-
-          if not message:
-              print("No scheduled message for this UTC hour.")
-              raise SystemExit(0)
-
-          payload = json.dumps({
-              "chat_id": chat_id,
-              "text": message
-          }).encode("utf-8")
-
-          request = urllib.request.Request(
-              f"https://api.telegram.org/bot{token}/sendMessage",
-              data=payload,
-              headers={"Content-Type": "application/json"}
-          )
-
-          try:
-              with urllib.request.urlopen(request, timeout=20) as response:
-                  result = json.load(response)
-              if result.get("ok"):
-                  print("Message sent successfully.")
-              else:
-                  print("Telegram rejected the message. Check bot permissions and secrets.")
-                  raise SystemExit(1)
-          except Exception:
-              print("Message could not be sent. Check the bot permissions, secrets, and workflow logs.")
-              raise SystemExit(1)
-          PY
