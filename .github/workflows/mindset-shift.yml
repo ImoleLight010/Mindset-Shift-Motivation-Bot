@@ -140,11 +140,15 @@ jobs:
                   print("Check the bot's group permissions and chat ID.")
                   raise SystemExit(1)
 
-          except urllib.error.HTTPError as error:
+                    except urllib.error.HTTPError as error:
               print(f"Telegram returned HTTP error {error.code}.")
-              print("Check the bot token, group ID, and permissions.")
+              try:
+                  details = error.read().decode("utf-8")
+                  print("Telegram response:", details)
+              except Exception:
+                  print("Could not read Telegram's error details.")
               raise SystemExit(1)
-
+              
           except urllib.error.URLError:
               print("Could not connect to Telegram. Please try again.")
               raise SystemExit(1)
