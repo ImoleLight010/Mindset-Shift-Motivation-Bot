@@ -1,0 +1,151 @@
+name: Mindset Shift Motivation Bot
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+    - cron: '0 11 * * *'
+    - cron: '0 15 * * *'
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+jobs:
+  send-message:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Motivation
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          EVENT_NAME: ${{ github.event_name }}
+
+        run: |
+          python - <<'PY'
+          import os
+          import json
+          import urllib.request
+          import urllib.error
+          from datetime import datetime, timezone
+
+          token = os.environ.get("BOT_TOKEN", "").strip()
+          chat_id = os.environ.get("CHAT_ID", "").strip()
+          event = os.environ.get("EVENT_NAME", "")
+
+          if not token or not chat_id:
+              print("ERROR: GitHub Secrets are missing.")
+              raise SystemExit(1)
+
+          messages = {
+              6: """🌅 GOOD MORNING, MINDSET SHIFTERS!
+
+          Every new day is an opportunity to learn, grow, and become better.
+
+          🎯 TODAY'S CHALLENGE:
+          What positive action will you take today?
+
+          Remember: small steps can lead to great progress.
+
+          💚 Better Thinking. Broader Understanding. Practical Growth.""",
+
+              11: """☀️ AFTERNOON MINDSET CHALLENGE!
+
+          Knowledge becomes powerful when you put it into practice.
+
+          🎯 YOUR CHALLENGE:
+          Identify one thing you have been postponing and take the first step today.
+
+          💬 DISCUSSION:
+          What usually stops people from acting on what they know?
+
+          Share your thoughts with the Mindset Shifters! 👇""",
+
+              15: """🧠 WISDOM OF THE DAY
+
+          📖 BIBLE — Proverbs 4:7 (KJV)
+          "Wisdom is the principal thing; therefore get wisdom: and with all thy getting get understanding."
+
+          ☪️ QURAN — Surah Az-Zumar 39:9 (excerpt)
+          أَمَّنْ هُوَ قَانِتٌ آنَاءَ اللَّيْلِ سَاجِدًا وَقَائِمًا
+          Meaning: Is one who is devoutly obedient during the night, prostrating and standing...
+
+          🔬 SCIENCE:
+          Consistent learning and practice help us develop skills.
+
+          💭 PHILOSOPHY:
+          Question your assumptions and examine your reasons.
+
+          🎯 QUESTION:
+          What new idea has changed the way you think?""",
+
+              19: """🌙 EVENING REFLECTION — MINDSET SHIFTERS
+
+          Before the day ends, ask yourself:
+
+          ✅ What did I learn today?
+          ✅ What did I do well?
+          ✅ What can I improve tomorrow?
+
+          Growth is not about perfection. It is about learning, reflection, and progress.
+
+          💬 DISCUSSION:
+          What lesson will you carry into tomorrow?
+
+          Rest well and keep growing! 💚"""
+          }
+
+          if event == "workflow_dispatch":
+              message = """🤖 MINDSET SHIFT BOT — TEST MESSAGE!
+
+          🎉 Your workflow has started successfully.
+
+          🌱 Keep learning.
+          💡 Keep thinking.
+          🚀 Keep growing.
+
+          Better Thinking. Broader Understanding. Practical Growth.
+
+          If this message appears in the group, your bot is connected!"""
+          else:
+              utc_hour = datetime.now(timezone.utc).hour
+              message = messages.get(utc_hour)
+
+          if not message:
+              print("No message scheduled for this hour.")
+              raise SystemExit(0)
+
+          payload = json.dumps({
+              "chat_id": chat_id,
+              "text": message
+          }).encode("utf-8")
+
+          request = urllib.request.Request(
+              f"https://api.telegram.org/bot{token}/sendMessage",
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST"
+          )
+
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  result = json.load(response)
+
+              if result.get("ok"):
+                  print("SUCCESS: Message sent to Telegram!")
+              else:
+                  print("Telegram error:", result.get("description", "Unknown error"))
+                  raise SystemExit(1)
+
+          except urllib.error.HTTPError as error:
+              print("Telegram HTTP error:", error.code)
+              try:
+                  details = json.loads(error.read().decode("utf-8"))
+                  print("Telegram response:", details.get("description", details))
+              except Exception:
+                  print("Unable to read Telegram error details.")
+              raise SystemExit(1)
+
+          except urllib.error.URLError as error:
+              print("Connection error:", error.reason)
+              raise SystemExit(1)
+
+          PY
