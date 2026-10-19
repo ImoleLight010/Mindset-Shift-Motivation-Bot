@@ -1,4 +1,4 @@
-name: Mindset Shift Daily Motivation
+name: Mindset Shift Motivation Bot
 
 on:
   schedule:
@@ -9,86 +9,137 @@ on:
   workflow_dispatch:
 
 jobs:
-  send-motivation:
+  send-message:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Send daily motivation
+      - name: Send Mindset Shift message
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          EVENT_NAME: ${{ github.event_name }}
+
         run: |
           python - <<'PY'
           import os
           import json
           import urllib.request
+          import urllib.error
           from datetime import datetime, timezone
 
-          token = os.environ["BOT_TOKEN"]
-          chat_id = os.environ["CHAT_ID"]
+          token = os.environ.get("BOT_TOKEN", "").strip()
+          chat_id = os.environ.get("CHAT_ID", "").strip()
+          event = os.environ.get("EVENT_NAME", "")
 
-          hour = datetime.now(timezone.utc).hour
+          if not token or not chat_id:
+              print("ERROR: A required GitHub secret is missing.")
+              raise SystemExit(1)
+
+          utc_hour = datetime.now(timezone.utc).hour
 
           messages = {
               6: """🌅 GOOD MORNING, MINDSET SHIFTERS!
 
-              Every new day is another opportunity to learn, grow, and become better than yesterday.
+          Every new day brings another opportunity to learn, grow, and become better.
 
-              📖 Reflection: Small, consistent steps can lead to remarkable progress.
+          🎯 TODAY'S CHALLENGE:
+          What positive action will you take today?
 
-              💡 Today's challenge: What one positive action will you take today?
-
-              Remember: Better Thinking. Broader Understanding. Practical Growth. 🚀""",
+          Better Thinking. Broader Understanding. Practical Growth. 🚀""",
 
               11: """☀️ AFTERNOON MINDSET CHALLENGE!
 
-              Growth begins when you move from merely knowing to actually doing.
+          Knowing what to do is important. Taking action makes the difference.
 
-              🎯 Today's challenge:
-              Identify one thing you've been postponing and take the first practical step toward completing it.
+          🎯 Identify one thing you have postponed and take the first step today.
 
-              💬 QUESTION: What usually stops people from acting on what they know?
-
-              Share your thoughts below! 👇""",
+          💬 DISCUSSION:
+          What prevents people from acting on what they know?""",
 
               15: """🧠 WISDOM OF THE DAY
 
-              📖 BIBLE — Proverbs 4:7
-              "Wisdom is the principal thing; therefore get wisdom: and with all thy getting get understanding."
+          📖 BIBLE — Proverbs 4:7
+          "Wisdom is the principal thing; therefore get wisdom: and with all thy getting get understanding."
 
-              ☪️ QURAN — Surah Az-Zumar 39:9 (excerpt)
-              هَلْ يَسْتَوِي الَّذِينَ يَعْلَمُونَ وَالَّذِينَ لَا يَعْلَمُونَ
-              Meaning: "Are those who know equal to those who do not know?"
+          ☪️ QURAN — Surah Az-Zumar 39:9
+          أَمَّنْ هُوَ قَانِتٌ آنَاءَ اللَّيْلِ سَاجِدًا وَقَائِمًا
+          Meaning: Is one who is devoutly obedient during the night, prostrating and standing...
 
-              🔬 SCIENCE: Learning and practising new skills helps strengthen the brain's ability to adapt.
+          🔬 SCIENCE:
+          Learning and practice help us develop skills.
 
-              💭 PHILOSOPHY: Examine your assumptions before accepting them as truth.
+          💭 PHILOSOPHY:
+          Question your assumptions and examine your reasons.
 
-              🎯 QUESTION: Which source of wisdom most challenges your thinking today?""",
+          🎯 QUESTION:
+          What idea has challenged your thinking recently?""",
 
               19: """🌙 EVENING REFLECTION — MINDSET SHIFTERS
 
-              Before today ends, pause and reflect.
+          Before today ends, reflect:
 
-              ✅ What did you learn today?
-              ✅ What did you do well?
-              ✅ What could you improve tomorrow?
+          ✅ What did you learn?
+          ✅ What did you do well?
+          ✅ What can you improve tomorrow?
 
-              Growth doesn't require perfection. It requires reflection, honesty, and a willingness to improve.
+          Growth requires reflection, honesty, and a willingness to improve.
 
-              💬 DISCUSSION: What is one lesson you'll carry into tomorrow?
+          💬 What lesson will you carry into tomorrow?
 
-              Rest well, keep learning, and keep growing! 💡"""
+          Keep learning and growing! 💚"""
           }
 
-                        message = messages.get(hour)
+          if event == "workflow_dispatch":
+              message = """🤖 MINDSET SHIFT BOT — TEST MESSAGE!
 
-if not message:
-    message = """🤖 MINDSET SHIFT BOT — TEST MESSAGE!
+          Your automated motivation bot is being tested.
 
-Your motivation bot is connected to GitHub Actions.
+          🌱 Keep learning.
+          💡 Keep thinking.
+          🚀 Keep growing.
 
-🌱 Keep learning.
-💡 Keep thinking.
-🚀 Keep growing.
+          Better Thinking. Broader Understanding. Practical Growth. 🎉"""
+          else:
+              message = messages.get(utc_hour)
 
-Better Thinking. Broader Understanding. Practical Growth."""
+          if not message:
+              print("No message scheduled for this UTC hour.")
+              raise SystemExit(0)
+
+          payload = json.dumps({
+              "chat_id": chat_id,
+              "text": message
+          }).encode("utf-8")
+
+          request = urllib.request.Request(
+              f"https://api.telegram.org/bot{token}/sendMessage",
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST"
+          )
+
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  result = json.load(response)
+
+              if result.get("ok"):
+                  print("SUCCESS: Telegram message sent!")
+              else:
+                  print("Telegram rejected the message:")
+                  print(result.get("description", "Unknown error"))
+                  raise SystemExit(1)
+
+          except urllib.error.HTTPError as error:
+              print(f"Telegram HTTP error: {error.code}")
+              try:
+                  details = json.loads(error.read().decode("utf-8"))
+                  print("Telegram response:", details.get("description", details))
+              except Exception:
+                  print("Could not read Telegram's error details.")
+              raise SystemExit(1)
+
+          except urllib.error.URLError as error:
+              print("Connection error:", error.reason)
+              raise SystemExit(1)
+
+          PY
