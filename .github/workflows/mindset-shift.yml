@@ -1,151 +1,65 @@
-name: Mindset Shift Motivation Bot
+name: Mindset Shift posts
 
 on:
   schedule:
-    - cron: '0 6 * * *'
-    - cron: '0 11 * * *'
-    - cron: '0 15 * * *'
-    - cron: '0 19 * * *'
+    # GitHub cron runs in UTC. Nigeria (WAT) = UTC+1. Minute 7 is quieter than minute 0.
+    - cron: "7 6 * * *"   # about 7:07 AM WAT  morning
+    - cron: "7 11 * * *"  # about 12:07 PM WAT afternoon
+    - cron: "7 15 * * *"  # about 4:07 PM WAT  wisdom
+    - cron: "7 19 * * *"  # about 8:07 PM WAT  evening
   workflow_dispatch:
+    inputs:
+      slot:
+        description: "morning | afternoon | wisdom | evening"
+        required: true
+        default: "morning"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mindset-post
+  cancel-in-progress: false
 
 jobs:
-  send-message:
+  post:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Send Motivation
-        env:
-          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          EVENT_NAME: ${{ github.event_name }}
+      - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests pillow
+
+      - name: Install fonts for pictures
+        run: sudo apt-get install -y -qq fonts-dejavu-core || true
+
+      - name: Pick slot
+        id: slot
         run: |
-          python - <<'PY'
-          import os
-          import json
-          import urllib.request
-          import urllib.error
-          from datetime import datetime, timezone
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ github.event.inputs.slot }}" >> $GITHUB_OUTPUT
+          else
+            case "${{ github.event.schedule }}" in
+              "7 6 * * *")  echo "name=morning" >> $GITHUB_OUTPUT ;;
+              "7 11 * * *") echo "name=afternoon" >> $GITHUB_OUTPUT ;;
+              "7 15 * * *") echo "name=wisdom" >> $GITHUB_OUTPUT ;;
+              "7 19 * * *") echo "name=evening" >> $GITHUB_OUTPUT ;;
+            esac
+          fi
 
-          token = os.environ.get("BOT_TOKEN", "").strip()
-          chat_id = os.environ.get("CHAT_ID", "").strip()
-          event = os.environ.get("EVENT_NAME", "")
+      - name: Generate and send
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python bot.py "${{ steps.slot.outputs.name }}"
 
-          if not token or not chat_id:
-              print("ERROR: GitHub Secrets are missing.")
-              raise SystemExit(1)
-
-          messages = {
-              6: """🌅 GOOD MORNING, MINDSET SHIFTERS!
-
-          Every new day is an opportunity to learn, grow, and become better.
-
-          🎯 TODAY'S CHALLENGE:
-          What positive action will you take today?
-
-          Remember: small steps can lead to great progress.
-
-          💚 Better Thinking. Broader Understanding. Practical Growth.""",
-
-              11: """☀️ AFTERNOON MINDSET CHALLENGE!
-
-          Knowledge becomes powerful when you put it into practice.
-
-          🎯 YOUR CHALLENGE:
-          Identify one thing you have been postponing and take the first step today.
-
-          💬 DISCUSSION:
-          What usually stops people from acting on what they know?
-
-          Share your thoughts with the Mindset Shifters! 👇""",
-
-              15: """🧠 WISDOM OF THE DAY
-
-          📖 BIBLE — Proverbs 4:7 (KJV)
-          "Wisdom is the principal thing; therefore get wisdom: and with all thy getting get understanding."
-
-          ☪️ QURAN — Surah Az-Zumar 39:9 (excerpt)
-          أَمَّنْ هُوَ قَانِتٌ آنَاءَ اللَّيْلِ سَاجِدًا وَقَائِمًا
-          Meaning: Is one who is devoutly obedient during the night, prostrating and standing...
-
-          🔬 SCIENCE:
-          Consistent learning and practice help us develop skills.
-
-          💭 PHILOSOPHY:
-          Question your assumptions and examine your reasons.
-
-          🎯 QUESTION:
-          What new idea has changed the way you think?""",
-
-              19: """🌙 EVENING REFLECTION — MINDSET SHIFTERS
-
-          Before the day ends, ask yourself:
-
-          ✅ What did I learn today?
-          ✅ What did I do well?
-          ✅ What can I improve tomorrow?
-
-          Growth is not about perfection. It is about learning, reflection, and progress.
-
-          💬 DISCUSSION:
-          What lesson will you carry into tomorrow?
-
-          Rest well and keep growing! 💚"""
-          }
-
-          if event == "workflow_dispatch":
-              message = """🤖 MINDSET SHIFT BOT — TEST MESSAGE!
-
-          🎉 Your workflow has started successfully.
-
-          🌱 Keep learning.
-          💡 Keep thinking.
-          🚀 Keep growing.
-
-          Better Thinking. Broader Understanding. Practical Growth.
-
-          If this message appears in the group, your bot is connected!"""
-          else:
-              utc_hour = datetime.now(timezone.utc).hour
-              message = messages.get(utc_hour)
-
-          if not message:
-              print("No message scheduled for this hour.")
-              raise SystemExit(0)
-
-          payload = json.dumps({
-              "chat_id": chat_id,
-              "text": message
-          }).encode("utf-8")
-
-          request = urllib.request.Request(
-              f"https://api.telegram.org/bot{token}/sendMessage",
-              data=payload,
-              headers={"Content-Type": "application/json"},
-              method="POST"
-          )
-
-          try:
-              with urllib.request.urlopen(request, timeout=30) as response:
-                  result = json.load(response)
-
-              if result.get("ok"):
-                  print("SUCCESS: Message sent to Telegram!")
-              else:
-                  print("Telegram error:", result.get("description", "Unknown error"))
-                  raise SystemExit(1)
-
-          except urllib.error.HTTPError as error:
-              print("Telegram HTTP error:", error.code)
-              try:
-                  details = json.loads(error.read().decode("utf-8"))
-                  print("Telegram response:", details.get("description", details))
-              except Exception:
-                  print("Unable to read Telegram error details.")
-              raise SystemExit(1)
-
-          except urllib.error.URLError as error:
-              print("Connection error:", error.reason)
-              raise SystemExit(1)
-
-          PY
+      - name: Save history (prevents repeats)
+        run: |
+          git config user.name "mindset-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add history.json
+          git diff --staged --quiet || (git commit -m "Update history" && git pull --rebase && git push)
